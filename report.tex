@@ -1,0 +1,205 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{listings}
+\geometry{lmargin=2cm, rmargin=2cm, tmargin=3cm}
+
+\author{Ho Guo Xian\\{\small 17WLR19013}}
+\title{Practical 2\\Converting an analog filter to digital filter}
+
+\date{\today}
+
+\lstset{
+numbers=left,
+numberstyle=\small,
+numbersep=8pt,
+frame = single,
+language=Scilab,
+framexleftmargin=15pt}
+
+
+\begin{document}
+\maketitle
+\section{Preliminaries}
+The specification frequencies for x, y and z are 20Hz, 200Hz and 2000Hz respectively. Figure \ref{fig:all_freq} shows all the generated frequencies with different combination of x, y and z
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[scale=0.3]{./test.pdf}
+    \caption{All generated waveform}
+    \label{fig:all_freq}
+\end{figure}
+
+For this practical, the chose analog filter will be high-pass filter, with aim of filtering signal \textit{x, y} away from signal \textit{xyz}.  
+
+\section{The design}
+For designing a high pass filter, following equation will be used.
+\begin{equation}
+    \label{eq:hs}
+    H(s) = \frac{s^2}{s^2 + 2 \zeta \omega_n s + \omega_n^2}
+\end{equation}
+With 
+\begin{equation}
+    \label{eq:nf}
+    \omega_n = natural frequency = 2\pi f_n
+\end{equation}
+\begin{equation}
+    \zeta = damping ratio
+\end{equation}
+The natural frequency $f_n$ selected will be $500Hz$. Upon substituting with equation \ref{eq:hs} and \ref{eq:nf}, following is the resulting transfer function.
+\begin{equation}
+    \label{eq:tf}
+    f(t) = \frac{s^2}{9869604.4 + 6283.1853s + s^2}
+\end{equation}
+The bode plot for the equation \ref{eq:tf} is shown in figure \ref{fig:bode}. The cutoff frequency around \textit{3dB} is around \textit{770Hz}. This is fine since it will be filtering out signal \textit{x} and \textit{y} because both frequency (20 and 200 Hz) is lower than \textit{770Hz}. 
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.8\linewidth]{./bode.pdf}
+    \caption{The resulting bode plot for equation \ref{eq:tf}}
+    \label{fig:bode}
+\end{figure}
+
+Following is the scilab code for constructing the transfer function and plot the bode plot.
+\begin{lstlisting}[language=Scilab]
+    // s transfer function
+    wn = 2*%pi*500
+    dampratio = 1
+    s = poly(0, "s");
+    Hs = s^2 / (s^2 + 2*dampratio*wn*s + wn^2)
+    disp(Hs)
+    h = syslin('c', Hs)
+    clf();bode(h, 0.01, 30000)
+\end{lstlisting}
+
+Now the analog filter is ready to convert into digital equivalent filter. Among all the methods out there, pole-zero mapping method is chosen for the conversion.
+First the the root of the denominator is found by equating $9869604.4 + 6283.1853s + s^2 = 0$, we will get $s_1 = -3142-0.147i$ and $s_2 = -3142+0.147i$
+
+Using the relationship of
+\begin{equation}
+    z = e^{st}
+\end{equation}
+We will get $z_1 = 0.961-1.767 \times 10 ^{-6}i$ and $z_2 = 0.961+1.767 \times 10 ^{-6}i$ where $t = \frac{1}{80kHz}$. The z transfer function is shown in equation \ref{eq:ztf}. 
+
+\begin{equation}
+    \label{eq:ztf}
+    T(z) = k\frac{(z-1)(z-1)}{(z-0.961-1.767 \times 10 ^{-6}i)(z-0.961+1.767 \times 10 ^{-6}i)}
+\end{equation}
+
+The transfer function is then being plotted by taking $z$ from $e^{i\pi n}$ where $n$ is 1000 points from 0 to 1, and $k$ is taken as $\frac{1}{max(abs(T(z)))}$. The result is shown in figure \ref{fig:ztf}
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.8\linewidth]{./ztf.pdf}
+    \caption{The frequency response of digital filter}
+    \label{fig:ztf}
+\end{figure}
+
+The final z transfer function is shown below.
+\begin{equation}
+    \label{eq:ztf_final}
+    T(z) = \frac{0.9618619 - 1.9237238z + 0.9618619z^2}{0.9244652 - 1.9229823z + z^2}
+\end{equation}
+
+The scilab code for converting to z transform and the plot is shown in listing \ref{lst:ztransform}
+
+\begin{lstlisting}[linewidth=12cm, caption={The scilab code for z transform}, label={lst:ztransform}]
+    s_den_root1 = -3141.593- %i*0.147
+    s_den_root2 = -3141.593+ %i*0.147
+    z_den_1 = exp(s_den_root1 * (1/80000))
+    z_den_2 = exp(s_den_root2 * (1/80000))
+    number = 0:0.001:1
+    z = exp(%i*%pi*number)
+    ztf = ((z-1).*(z-1))./((z-z_den_1) .* (z-z_den_2))
+    k = 1 / max(abs(ztf))
+    ztfk = ztf * k
+    clf();plot(number, 20 * log(abs(ztfk)))
+
+    z = poly(0, 'z')
+    ztf = ((z-1)*(z-1))/((z-z_den_1) * (z-z_den_2)) * k
+\end{lstlisting}
+
+The transfer function in equation \ref{eq:ztf_final} is then undergo long division to get the actual filter signal, listing \ref{lst:ldiv} shows the scilab code and figure \ref{fig:ldiv} shows the plot of the filter.
+
+\begin{lstlisting}[linewidth=8cm, label={lst:ldiv}, caption={scilab code for long division}]
+    ld = ldiv(ztf.num, ztf.den, 25);
+    clf();plot(1:length(ld), (ld))
+\end{lstlisting}
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.8\linewidth]{./ldiv.pdf}
+    \caption{The plot of the digital filter}
+    \label{fig:ldiv}
+\end{figure}
+
+\section{The result}
+For the digital filter shown in equation \ref{eq:ztf_final}, it will be convolute with signal $xyz$. The scilab code is shown in listing \ref{lst:conv}. The resulting graph is shown in figure \ref{fig:conv}
+
+\begin{minipage}{\linewidth}
+\begin{lstlisting}[linewidth=16cm, caption={scilab code for convolution with signal xyz}, label={lst:conv}]
+    convd = conv(ld, xyzl);
+    clf();subplot(2,1,1), plot(1:length(convd), convd)
+    subplot(2,1,2), plot(t2, xyzl), title('xyz(t)'), xlabel('t2(s)'); 
+\end{lstlisting}
+\end{minipage}
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.8\linewidth]{conv.pdf}
+    \caption{convolution of equation \ref{eq:ztf_final} with signal $xyz$, top is resulting signal, bottom is signal xyz}
+    \label{fig:conv}
+\end{figure}
+
+In the figure \ref{fig:conv}, it's clearly seen that the signal $x$ can't be seen from the result, while the frequency of y and z still visible.
+
+\section{The discussion}
+In figure \ref{fig:ztf}, the cutoff frequency obtained is $0.031 \times 40kHz = 1240Hz$ where $nyquist = 40Khz$. 1240Hz is way higher than the cutoff frequency for analog transfer function shown in figure \ref{fig:bode} which is around 769Hz. But since 1240Hz is still able to filter 200Hz and 20Hz while pass 2000Hz through, the equivalent digital filter is still performed the job required.
+
+Bilinear method is carried out to find out whether the digital equivalent filter is more accurate than pole-zero mapping method, and surprisingly, the result we gathered is almost the same with the digital filter have cutoff frequency almost twice the analog filter.
+
+Listing \ref{lst:bil} shows the scilab code for converting to analog filter using bilinear transformation.
+\begin{lstlisting}[linewidth=15cm, caption={scilab code for bilinear transformation}, label={lst:bil}]
+    slss=tf2ss(h_lin);  //Now in state-space form
+    sl1=cls2dls(slss,1/80000);  //sl1= output of cls2dls
+    sl1t=ss2tf(sl1) // Converts in transfer form
+    disp(sl1t)
+\end{lstlisting}
+
+
+The resulting z transfer function is shown below in equation \ref{eq:ztf_bil}. The frequency response of the z transfer function is then plotted out using the same method in pole-zero mapping. Figure \ref{fig:bode_bil} shows the result. The cutoff frequency in this case will be $0.031 \times 40Khz = 1240Hz$ which is exactly the same with pole-zero mapping method.
+
+\begin{equation}
+    \label{eq:ztf_bil}
+    T(z) = \frac{0.9618571 - 1.9237143z + 0.9618571z^2}{0.9244559 - 1.9229726z + z^2}
+\end{equation}
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.8\linewidth]{bode_bil.pdf}
+    \caption{The frequency response of z transfer function in equation \ref{eq:ztf_bil}}
+    \label{fig:bode_bil}
+\end{figure}
+
+The plot after long division is shown in figure \ref{fig:ldiv_bil}, and it's similar to figure \ref{fig:ldiv}.
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.8\linewidth]{ldiv_bil.pdf}
+    \caption{Plot after long division}
+    \label{fig:ldiv_bil}
+\end{figure}
+
+After bilinear transformation, the filter is then convolute with signal xyz and figure \ref{fig:conv_bil} shows the result after convolution. Again it can clearly see that the result is similar with figure \ref{fig:conv}.
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.8\linewidth]{conv_bil.pdf}
+    \caption{Convolution with signal xyz, top is result, bottom is signal xyz.}
+    \label{fig:conv_bil}
+\end{figure}
+
+\pagebreak
+\section{The conclusion}
+Even though the analog to digital transformation is not accurate, but because of the resulting digital filter still meet the requirement of filtering 20Hz and 200Hz out of the signal, so the result shown is still technically correct. Perhaps direct design of z transfer function will be more suitable for simple filter like this. To conclude, the a high pass digital filter is built and succesfully filtered all low frequency signals.
+\end{document}
+

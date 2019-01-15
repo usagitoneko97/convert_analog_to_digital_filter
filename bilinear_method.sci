@@ -21,7 +21,7 @@ subplot(4,2,4), plot(t2, yl), title('y(t)'), xlabel('t2(s)');
 subplot(4,2,5), plot(t2, xl), title('x(t)'), xlabel('t2(s)');
 subplot(4,2,6), plot(t2, z1), title('z(t)'), xlabel('t2(s)'); 
 
-wn = 2*%pi*1000
+wn = 2*%pi*500
 dampratio = 1
 s = poly(0, "s");
 Hs = s^2 / (s^2 + 2*dampratio*wn*s + wn^2)
@@ -36,7 +36,7 @@ sl1t=ss2tf(sl1) // Converts in transfer form
 disp(sl1t)
 number = 0:0.001:1
 z = exp(%i*%pi*number)
-tz = (0.9258557 - 1.8517114*z + 0.9258557*z.^2) ./(0.8545669 - 1.8488558*z + z.^2)
+tz = (0.9618571 - 1.9237143*z + 0.9618571*z^2) ./(0.9244559 - 1.9229726*z + z^2)
 clf();plot(number, 20 * log(abs(tz)))
 
 ld_bil = ldiv(sl1t.num, sl1t.den, 2500)
